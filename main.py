@@ -14,7 +14,7 @@ import gtts
 from llm import Chatbot
 from pathlib import Path
 import shutil
-from helper import get_store_input_path,get_store_output_path
+from helper import get_store_input_path, get_store_output_path
 
 os.getcwd()
 
@@ -23,8 +23,11 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-API_URL_STT = "https://api-inference.huggingface.co/models/khuzaimakt/whisper-small-ur-kt"
+API_URL_STT = (
+    "https://api-inference.huggingface.co/models/khuzaimakt/whisper-small-ur-kt"
+)
 headers_STT = {"Authorization": "Bearer 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"}
+
 
 # User endpoints
 @app.post("/users/", response_model=crud.UserResponse)
@@ -32,10 +35,9 @@ async def create_user(user: crud.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.phoneno == user.phoneno).first()
     if db_user:
         return db_user
-    db_user= crud.create_user(db=db, user=user)
+    db_user = crud.create_user(db=db, user=user)
 
     return db_user
-
 
 
 @app.delete("/users/{user_id}")
@@ -49,20 +51,23 @@ async def delete_user(user_id: int, db: Session = Depends(get_db)):
 
 # ChatSession endpoints
 @app.post("/sessions/", response_model=crud.ChatSessionCreate)
-async def create_chat_session(session: crud.ChatSessionCreate, db: Session = Depends(get_db)):
+async def create_chat_session(
+    session: crud.ChatSessionCreate, db: Session = Depends(get_db)
+):
     return crud.create_chat_session(db=db, session=session)
 
 
 @app.post("/sessions/user_id")
-async def read_chat_session(user_id: int, db: Session = Depends(get_db)):
-    db_session = crud.get_chat_sessions(db=db, user_id=user_id)
+async def read_chat_session(user: crud.ReadChatSession, db: Session = Depends(get_db)):
+    db_session = crud.get_chat_sessions(db=db, user_id=user.user_id)
     if db_session is None:
         raise HTTPException(status_code=404, detail="Chat session not found")
-    
+
     ids = [session.id for session in db_session]
     session_names = [session.session_name for session in db_session]
-    
+
     return {"ids": ids, "session_names": session_names}
+
 
 @app.delete("/sessions/{session_id}")
 async def delete_chat_session(session_id: int, db: Session = Depends(get_db)):
@@ -73,21 +78,26 @@ async def delete_chat_session(session_id: int, db: Session = Depends(get_db)):
     return {"message": "Chat session deleted successfully"}
 
 
-
 @app.post("/messages/get_messages")
-async def read_message(user_id: int, session_id:int, db: Session = Depends(get_db)):
-    db_message = crud.get_messages(db=db, user_id=user_id,session_id=session_id)
+async def read_message(user: crud.ReadMessage, db: Session = Depends(get_db)):
+    db_message = crud.get_messages(
+        db=db, user_id=user.user_id, session_id=user.session_id
+    )
     if db_message is None:
         raise HTTPException(status_code=404, detail="Messages not found")
-    
+
     queries = [session.query for session in db_message]
     responses = [session.response for session in db_message]
-    query_audios= [session.query_audio for session in db_message]
-    response_audios= [session.response_audio for session in db_message]
+    query_audios = [session.query_audio for session in db_message]
+    response_audios = [session.response_audio for session in db_message]
 
-    
-    return {"queries": queries, "responses": responses, "query_audios": query_audios,"response_audios":response_audios}
-    
+    return {
+        "queries": queries,
+        "responses": responses,
+        "query_audios": query_audios,
+        "response_audios": response_audios,
+    }
+
 
 @app.delete("/messages/{message_id}")
 def delete_message(message_id: int, db: Session = Depends(get_db)):
@@ -105,55 +115,69 @@ async def speech_to_text(query_audio: UploadFile = File(...)):
     response = requests.post(API_URL_STT, headers=headers_STT, data=contents)
 
     output = response.json()
-    return output['text']
+    return output["text"]
+
 
 @app.post("/messages/create_message")
-async def create_message(user_id: int, session_id:int, query:str,  query_audio: UploadFile = File(None),  db: Session = Depends(get_db)):
+async def create_message(
+    user: crud.CreateMessage,
+    db: Session = Depends(get_db),
+):
 
-    if query_audio:
-        new_file_path_input = get_store_input_path(user_id, session_id)
+    if user.query_audio:
+        new_file_path_input = get_store_input_path(user.user_id, user.session_id)
         with open(new_file_path_input, "wb") as buffer:
-            shutil.copyfileobj(query_audio.file, buffer)
-        query_audio.file.close()
+            shutil.copyfileobj(user.query_audio.file, buffer)
+        user.query_audio.file.close()
     else:
-        new_file_path_input = 'None'
+        new_file_path_input = "None"
 
     def read_preprompts(filename: str):
         def parse(data):
             prompts = []
             for item in data:
-                prompts.append('\n'.join([indiv.strip() for indiv in item.split("\n") if indiv.strip()]))
+                prompts.append(
+                    "\n".join(
+                        [indiv.strip() for indiv in item.split("\n") if indiv.strip()]
+                    )
+                )
             return prompts
 
-        with open(filename, 'r', encoding='utf-8') as file:
+        with open(filename, "r", encoding="utf-8") as file:
             data = json.load(file)
         return parse(data)
-    
-    preprompts= read_preprompts('preprompts_en.json')
+
+    preprompts = read_preprompts("preprompts_en.json")
 
     chatbot = Chatbot(preprompts, "ur", "en")
 
-    model_answer, translated_answer = chatbot.execute_pipeline(query)
+    model_answer, translated_answer = chatbot.execute_pipeline(user.query)
 
-    
     tts = gtts.gTTS(translated_answer, lang="ur")
-    new_file_path_output= get_store_output_path(user_id,session_id)
+    new_file_path_output = get_store_output_path(user.user_id, user.session_id)
 
     tts.save(new_file_path_output)
 
-
-    db_message = crud.create_message(db=db, user_id=user_id,session_id=session_id,query=query,response=translated_answer,query_audio= new_file_path_input,response_audio=new_file_path_output)
+    db_message = crud.create_message(
+        db=db,
+        user_id=user.user_id,
+        session_id=user.session_id,
+        query=user.query,
+        response=translated_answer,
+        query_audio=new_file_path_input,
+        response_audio=new_file_path_output,
+    )
     if db_message is None:
         raise HTTPException(status_code=404, detail="Messages not found")
-    
-    file_name='output_tts.mp3'
-    
-    return FileResponse(path=new_file_path_output, filename=file_name, media_type='audio/mpeg')
-    
-    
-    
+
+    file_name = "output_tts.mp3"
+
+    return FileResponse(
+        path=new_file_path_output, filename=file_name, media_type="audio/mpeg"
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

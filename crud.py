@@ -1,17 +1,39 @@
 from sqlalchemy.orm import Session
 from models import User, ChatSession, Message
 from pydantic import BaseModel
+from fastapi import File, UploadFile
 
 # Pydantic models
+
+
+class ReadChatSession(BaseModel):
+    user_id: int
+
+
+class CreateMessage(BaseModel):
+    user_id: int
+    session_id: int
+    query: str
+    query_audio: UploadFile = (File(None),)
+
+
+class ReadMessage(BaseModel):
+    user_id: int
+    session_id: int
+
+
 class UserCreate(BaseModel):
     phoneno: str
 
+
 class UserResponse(BaseModel):
-    id:int
+    id: int
+
 
 class ChatSessionCreate(BaseModel):
     user_id: int
     session_name: str
+
 
 class MessageCreate(BaseModel):
     user_id: int
@@ -21,16 +43,17 @@ class MessageCreate(BaseModel):
     query_audio: str
     response_audio: str
 
+
 class MessageResponse(BaseModel):
     query: str
     response: str
     query_audio: str
     response_audio: str
 
+
 # User CRUD operations
 def get_user(db: Session, user_id: int):
     return db.query(User).filter(User.id == user_id).first()
-
 
 
 def create_user(db: Session, user: UserCreate):
@@ -40,6 +63,7 @@ def create_user(db: Session, user: UserCreate):
     db.refresh(db_user)
     return db_user
 
+
 def delete_user(db: Session, user_id: int):
     db_user = get_user(db, user_id)
     if db_user:
@@ -47,12 +71,14 @@ def delete_user(db: Session, user_id: int):
         db.commit()
     return db_user
 
+
 # ChatSession CRUD operations
 def get_chat_sessions(db: Session, user_id: int):
     return db.query(ChatSession).filter(ChatSession.user_id == user_id).all()
 
-def get_chat_session(db: Session, session_id:int):
-    return db.query(ChatSession).filter(ChatSession.id ==session_id).first()
+
+def get_chat_session(db: Session, session_id: int):
+    return db.query(ChatSession).filter(ChatSession.id == session_id).first()
 
 
 def create_chat_session(db: Session, session: ChatSessionCreate):
@@ -70,26 +96,42 @@ def delete_chat_session(db: Session, session_id: int):
         db.commit()
     return db_session
 
+
 # Message CRUD operations
-def get_messages(db: Session, user_id: int,session_id:int):
-    return db.query(Message).filter(Message.user_id == user_id and Message.session_id==session_id).all()
+def get_messages(db: Session, user_id: int, session_id: int):
+    return (
+        db.query(Message)
+        .filter(Message.user_id == user_id and Message.session_id == session_id)
+        .all()
+    )
+
 
 def get_message(db: Session, message_id: int):
     return db.query(Message).filter(Message.id == message_id).first()
 
-def create_message(db: Session,user_id:int,session_id:int,query:str,response:str,query_audio:str,response_audio:str):
+
+def create_message(
+    db: Session,
+    user_id: int,
+    session_id: int,
+    query: str,
+    response: str,
+    query_audio: str,
+    response_audio: str,
+):
     db_message = Message(
         user_id=user_id,
         session_id=session_id,
-        query= query,
-        response= response,
-        query_audio= query_audio,
-        response_audio= response_audio
+        query=query,
+        response=response,
+        query_audio=query_audio,
+        response_audio=response_audio,
     )
     db.add(db_message)
     db.commit()
     db.refresh(db_message)
     return db_message
+
 
 def delete_message(db: Session, message_id: int):
     db_message = get_message(db, message_id)
