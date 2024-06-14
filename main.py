@@ -172,9 +172,7 @@ async def create_message(
 
     file_name = "output_tts.mp3"
 
-    return FileResponse(
-        path=new_file_path_output, filename=file_name, media_type="audio/mpeg"
-    )
+    return translated_answer
 
 
 if __name__ == "__main__":
