@@ -124,14 +124,6 @@ async def create_message(
     db: Session = Depends(get_db),
 ):
 
-    if user.query_audio:
-        new_file_path_input = get_store_input_path(user.user_id, user.session_id)
-        with open(new_file_path_input, "wb") as buffer:
-            shutil.copyfileobj(user.query_audio.file, buffer)
-        user.query_audio.file.close()
-    else:
-        new_file_path_input = "None"
-
     def read_preprompts(filename: str):
         def parse(data):
             prompts = []
@@ -153,25 +145,19 @@ async def create_message(
 
     model_answer, translated_answer = chatbot.execute_pipeline(user.query)
 
-    tts = gtts.gTTS(translated_answer, lang="ur")
-    new_file_path_output = get_store_output_path(user.user_id, user.session_id)
-
-    tts.save(new_file_path_output)
-
+    
     db_message = crud.create_message(
         db=db,
         user_id=user.user_id,
         session_id=user.session_id,
         query=user.query,
         response=translated_answer,
-        query_audio=new_file_path_input,
-        response_audio=new_file_path_output,
+        
     )
     if db_message is None:
         raise HTTPException(status_code=404, detail="Messages not found")
 
-    file_name = "output_tts.mp3"
-
+    
     return translated_answer
 
 
