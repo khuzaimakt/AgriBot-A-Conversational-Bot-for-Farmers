@@ -117,6 +117,15 @@ async def speech_to_text(query_audio: UploadFile = File(...)):
     output = response.json()
     return output["text"]
 
+@app.post("/Text-To-Speech/")
+async def text_to_speech(text: str):
+    output_file = "output_tts.mp3"
+    tts = gtts.gTTS(text, lang="ur")
+    tts.save(output_file)
+
+    return FileResponse(path=output_file, filename=output_file, media_type='audio/mpeg')
+
+
 
 @app.post("/messages/create_message")
 async def create_message(

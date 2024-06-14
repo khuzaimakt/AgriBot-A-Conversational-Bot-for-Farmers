@@ -25,7 +25,7 @@ class Chatbot:
     # Loading the Llama model from huggingface. This model is received for educational purposes only and hence is open source for non commercial usecases.
     self.model_name = "meta-llama/Llama-2-7b-chat-hf"
 
-    self.url = "https://api-inference.huggingface.co/models/meta-llama/Llama-2-7b-chat-hf"
+    self.url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B"
     self.auth_token = "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"
 
   def find_max_cosine_preprompt(self, query):
