@@ -14,7 +14,6 @@ class CreateMessage(BaseModel):
     user_id: int
     session_id: int
     query: str
-    query_audio: UploadFile = (File(None),)
 
 
 class ReadMessage(BaseModel):
@@ -116,16 +115,14 @@ def create_message(
     session_id: int,
     query: str,
     response: str,
-    query_audio: str,
-    response_audio: str,
 ):
     db_message = Message(
         user_id=user_id,
         session_id=session_id,
         query=query,
         response=response,
-        query_audio=query_audio,
-        response_audio=response_audio,
+        query_audio='None',
+        response_audio='None',
     )
     db.add(db_message)
     db.commit()
